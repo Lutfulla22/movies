@@ -10,27 +10,32 @@ namespace movies.Services
 {
     public class GenreService : IGenreService
     {
-        private readonly MoviesContext _ctx;
+        private readonly MoviesContext _context;
         private readonly ILogger<GenreService> _logger;
 
         public GenreService(MoviesContext context, ILogger<GenreService> logger)
         {
-            _ctx = context;
+            _context = context;
             _logger = logger;
         }
-
-        public async Task<(bool IsSuccess, Exception Exception)> CreateAsync(Genre genre)
+        public async Task<(bool IsSuccess, Exception Exception, Genre Genre)> CreateAsync(Genre genre)
         {
+            if (await ExistsAsync(genre.Name))
+            {
+                return (false, new Exception(nameof(genre.Name)), null);
+            }
             try
             {
-                await _ctx.Genres.AddAsync(genre);
-                await _ctx.SaveChangesAsync();
+                await _context.Genres.AddAsync(genre);
+                await _context.SaveChangesAsync();
 
-                return (true, null);
+                _logger.LogInformation($"Genre created in DB. ID: {genre.Id}");
+                return (true, null, genre);
             }
             catch (Exception e)
             {
-                return (false, e);
+                _logger.LogInformation($"Creating Genre in DB failed.");
+                return (false, e, null);
             }
         }
 
@@ -39,29 +44,33 @@ namespace movies.Services
             var genre = await GetAsync(id);
             if (genre == default(Genre))
             {
-                return (false, new ArgumentException("Not found."));
+                return (false, new Exception("Not found."));
             }
-
             try
             {
-                _ctx.Genres.Remove(genre);
-                await _ctx.SaveChangesAsync();
+                _context.Remove(genre);
+                await _context.SaveChangesAsync();
 
+                _logger.LogInformation($"Genre deleted in DB. ID: {genre.Id}");
                 return (true, null);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                return (false, e);
+                _logger.LogInformation($"Deleting Genre in DB failed.");
+                return (false, new Exception());
             }
         }
 
         public Task<bool> ExistsAsync(Guid id)
-                => _ctx.Genres.AnyAsync(g => g.Id == id);
+            => _context.Genres.AnyAsync(g => g.Id == id);
+
+        public Task<bool> ExistsAsync(string name)
+            => _context.Genres.AnyAsync(g => g.Name == name);
 
         public Task<List<Genre>> GetAllAsync()
-                => _ctx.Genres.ToListAsync();
+            => _context.Genres.ToListAsync();
 
         public Task<Genre> GetAsync(Guid id)
-                => _ctx.Genres.FirstOrDefaultAsync(g => g.Id == id);
+            => _context.Genres.FirstOrDefaultAsync(g => g.Id == id);
     }
 }

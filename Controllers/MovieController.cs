@@ -1,8 +1,10 @@
+using System;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using movies.Entities;
 using movies.Mappers;
 using movies.Models;
 using movies.Services;
@@ -13,62 +15,85 @@ namespace movies.Controllers
     [Route("api/[controller]")]
     public class MovieController : ControllerBase
     {
-        private readonly IMovieService _ms;
-        private readonly IActorService _as;
-        private readonly IGenreService _gs;
+        private readonly IMovieService _movieService;
+        private readonly IActorService _actorService;
+        private readonly IGenreService _genreService;
 
-        public MovieController(
-            IMovieService movieService,
-            IGenreService genreService,
-            IActorService actorService)
+        public MovieController(IMovieService movieService, IActorService actorService, IGenreService genreService)
         {
-            _ms = movieService;
-            _as = actorService;
-            _gs = genreService;
+            _movieService = movieService;
+            _actorService = actorService;
+            _genreService = genreService;
         }
 
         [HttpPost]
-        public async Task<IActionResult> PostAsync(NewMovie movie)
+        public async Task<IActionResult> PostAsync([FromBody] NewMovie movie)
         {
-            if (movie.ActorIds.Count() < 1 || movie.GenreIds.Count() < 1)
+            if (movie.ActorsId.Count() < 1 || movie.GenresId.Count() < 1)
             {
-                return BadRequest("Actors and Genres are required");
+                return BadRequest("Actors and Genres are required.");
             }
-
-            if (!movie.GenreIds.All(id => _gs.ExistsAsync(id).Result))
+            if (!movie.ActorsId.All(id => _actorService.ExistsAsync(id).Result))
             {
-                return BadRequest("Genre doesnt exist");
+                return BadRequest("Actor doesnt exists.");
             }
-
-            if (!movie.ActorIds.All(id => _as.ExistsAsync(id).Result))
+            if (!movie.GenresId.All(id => _genreService.ExistsAsync(id).Result))
             {
-                return BadRequest("Actor doesnt exist");
+                return BadRequest("Genre doesnt exists.");
             }
-
-            var genres = movie.GenreIds.Select(id => _gs.GetAsync(id).Result);
-            var actors = movie.ActorIds.Select(id => _as.GetAsync(id).Result);
-
-            var result = await _ms.CreateAsync(movie.ToEntity(actors, genres));
-
-            if (result.IsSuccess)
+            var actors = movie.ActorsId.Select(id => _actorService.GetAsync(id).Result);
+            var genres = movie.GenresId.Select(id => _genreService.GetAsync(id).Result);
+            JsonSerializerOptions options = new()
             {
-                return Ok();
-            }
+                ReferenceHandler = ReferenceHandler.Preserve,
+                WriteIndented = true
+            };
+            var result = JsonSerializer.Serialize(await _movieService.CreateAsync(movie.ToEntity(actors, genres)), options);
 
-            return BadRequest(result.Exception.Message);
+            return Ok(result);
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAsync()
+        public async Task<IActionResult> GetAllAsync()
         {
             JsonSerializerOptions options = new()
             {
                 ReferenceHandler = ReferenceHandler.Preserve,
                 WriteIndented = true
             };
+            var result = JsonSerializer.Serialize(await _movieService.GetAllAsync(), options);
+            return Ok(result);
+        }
 
-            var json = JsonSerializer.Serialize(await _ms.GetAllAsync(), options);
-            return Ok(json);
+        [HttpDelete]
+        [Route("{id}")]
+        public async Task<IActionResult> DeleteAsync([FromRoute] Guid id)
+            => Ok(await _movieService.DeleteAsync(id));
+
+        [HttpGet]
+        [Route("{id}")]
+        public async Task<IActionResult> GetAsync([FromRoute] Guid id)
+        {
+            JsonSerializerOptions options = new()
+            {
+                ReferenceHandler = ReferenceHandler.Preserve,
+                WriteIndented = true
+            };
+            var result = JsonSerializer.Serialize(await _movieService.GetAsync(id), options);
+
+            return Ok(result);
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> PutAsync([FromBody] Movie movie)
+        {
+            JsonSerializerOptions options = new()
+            {
+                ReferenceHandler = ReferenceHandler.Preserve,
+                WriteIndented = true
+            };
+            var result = JsonSerializer.Serialize(await _movieService.UpdateAsync(movie), options);
+            return Ok(result);
         }
     }
 }

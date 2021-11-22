@@ -13,17 +13,17 @@ namespace movies.Models
         [MaxLength(1024)]
         public string Description { get; set; }
 
+        [Range(1, 10)]
         [Required]
-        [Range(0, 10)]
         public double Rating { get; set; }
 
         [Required]
-        public DateTimeOffset ReleaseDate { get; set; }
+        public DateTimeOffset RealiseDate { get; set; }
 
         [Required]
-        public IEnumerable<Guid> GenreIds { get; set; }
+        public IEnumerable<Guid> ActorsId { get; set; }
 
         [Required]
-        public IEnumerable<Guid> ActorIds { get; set; }
+        public IEnumerable<Guid> GenresId { get; set; }
     }
 }
